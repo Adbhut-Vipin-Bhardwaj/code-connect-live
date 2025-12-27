@@ -9,12 +9,19 @@ export interface Session {
   code: string;
 }
 
+export interface CursorPosition {
+  lineNumber: number;
+  column: number;
+}
+
 export interface Participant {
   id: string;
   name: string;
   avatar: string;
+  color: string;
   isOnline: boolean;
-  cursor?: { line: number; column: number };
+  cursor?: CursorPosition;
+  isTyping?: boolean;
 }
 
 export interface CodeExecutionResult {
@@ -97,11 +104,14 @@ int main() {
 `,
 };
 
+// Participant colors for cursor indicators
+const participantColors = ['#00d4ff', '#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3'];
+
 // Mock participant names and avatars
 const mockParticipants: Omit<Participant, 'id' | 'isOnline'>[] = [
-  { name: 'Alex Chen', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alex' },
-  { name: 'Sarah Miller', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sarah' },
-  { name: 'Jordan Lee', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=jordan' },
+  { name: 'Alex Chen', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alex', color: participantColors[0] },
+  { name: 'Sarah Miller', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sarah', color: participantColors[1] },
+  { name: 'Jordan Lee', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=jordan', color: participantColors[2] },
 ];
 
 // API Functions
@@ -124,6 +134,7 @@ export async function createSession(title: string, language: string = 'javascrip
     id: uuidv4(),
     name: 'You (Host)',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=host',
+    color: participantColors[3],
     isOnline: true,
   };
   sessionParticipants.set(session.id, [creator]);
@@ -189,10 +200,14 @@ export async function getParticipants(sessionId: string): Promise<Participant[]>
 export async function joinSession(sessionId: string, name: string): Promise<Participant> {
   await delay(200);
   
+  const existingParticipants = sessionParticipants.get(sessionId) || [];
+  const colorIndex = existingParticipants.length % participantColors.length;
+  
   const participant: Participant = {
     id: uuidv4(),
     name,
     avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
+    color: participantColors[colorIndex],
     isOnline: true,
   };
   
@@ -261,10 +276,11 @@ export function simulateParticipantCursor(
     if (otherParticipants.length > 0) {
       const randomParticipant = otherParticipants[Math.floor(Math.random() * otherParticipants.length)];
       randomParticipant.cursor = {
-        line: Math.floor(Math.random() * 20) + 1,
+        lineNumber: Math.floor(Math.random() * 15) + 1,
         column: Math.floor(Math.random() * 40) + 1,
       };
-      callback(randomParticipant);
+      randomParticipant.isTyping = Math.random() > 0.3;
+      callback({ ...randomParticipant });
     }
   }, 2000);
   
