@@ -1,0 +1,409 @@
+openapi: 3.0.3
+info:
+  title: Code Connect Live API
+  description: API specification for the Code Connect Live collaborative coding platform backend.
+  version: 1.0.0
+servers:
+  - url: https://api.codeconnectlive.com/v1
+    description: Production server
+  - url: http://localhost:3000/v1
+    description: Local development server
+
+components:
+  schemas:
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique session identifier
+        title:
+          type: string
+          description: Session title
+        createdAt:
+          type: string
+          format: date-time
+          description: Session creation timestamp
+        language:
+          type: string
+          enum: [javascript, python, typescript, java, cpp]
+          description: Programming language for the session
+        code:
+          type: string
+          description: Current code in the session
+      required:
+        - id
+        - title
+        - createdAt
+        - language
+        - code
+
+    Participant:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique participant identifier
+        name:
+          type: string
+          description: Participant's name
+        avatar:
+          type: string
+          format: uri
+          description: URL to participant's avatar
+        color:
+          type: string
+          description: Hex color code for participant's cursor
+        isOnline:
+          type: boolean
+          description: Whether the participant is currently online
+        cursor:
+          $ref: '#/components/schemas/CursorPosition'
+        isTyping:
+          type: boolean
+          description: Whether the participant is currently typing
+      required:
+        - id
+        - name
+        - avatar
+        - color
+        - isOnline
+
+    CursorPosition:
+      type: object
+      properties:
+        lineNumber:
+          type: integer
+          minimum: 1
+          description: Line number of cursor position
+        column:
+          type: integer
+          minimum: 1
+          description: Column number of cursor position
+      required:
+        - lineNumber
+        - column
+
+    CodeExecutionResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Whether the code execution was successful
+        output:
+          type: string
+          description: Standard output from code execution
+        error:
+          type: string
+          description: Error message if execution failed
+        executionTime:
+          type: number
+          format: float
+          description: Execution time in milliseconds
+      required:
+        - success
+        - output
+        - executionTime
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: integer
+          description: HTTP status code
+      required:
+        - error
+        - code
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+paths:
+  /sessions:
+    post:
+      summary: Create a new coding session
+      operationId: createSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  description: Session title
+                language:
+                  type: string
+                  enum: [javascript, python, typescript, java, cpp]
+                  default: javascript
+                  description: Programming language
+              required:
+                - title
+      responses:
+        '201':
+          description: Session created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /sessions/{sessionId}:
+    get:
+      summary: Get session details
+      operationId: getSession
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Unique session identifier
+      responses:
+        '200':
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Update session code
+      operationId: updateSessionCode
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Unique session identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: Updated code
+              required:
+                - code
+      responses:
+        '200':
+          description: Code updated successfully
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /sessions/{sessionId}/language:
+    put:
+      summary: Update session language
+      operationId: updateSessionLanguage
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Unique session identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                language:
+                  type: string
+                  enum: [javascript, python, typescript, java, cpp]
+                  description: New programming language
+              required:
+                - language
+      responses:
+        '200':
+          description: Language updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    description: Default code for the new language
+                required:
+                  - code
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /sessions/{sessionId}/participants:
+    get:
+      summary: Get session participants
+      operationId: getParticipants
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Unique session identifier
+      responses:
+        '200':
+          description: List of participants
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Participant'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Join a session as a participant
+      operationId: joinSession
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Unique session identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Participant's name
+              required:
+                - name
+      responses:
+        '200':
+          description: Joined session successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Participant'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Participant already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /execute:
+    post:
+      summary: Execute code
+      operationId: executeCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: Code to execute
+                language:
+                  type: string
+                  enum: [javascript, python, typescript, java, cpp]
+                  description: Programming language
+              required:
+                - code
+                - language
+      responses:
+        '200':
+          description: Code execution result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CodeExecutionResult'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+security:
+  - bearerAuth: []
