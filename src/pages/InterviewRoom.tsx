@@ -12,6 +12,7 @@ import {
   updateSessionLanguage,
   getParticipants,
   executeCode,
+  simulateParticipantCursor,
   simulateParticipantJoin,
   Session,
   Participant,
@@ -74,6 +75,19 @@ const InterviewRoom = () => {
 
     loadSession();
   }, [sessionId, navigate, toast]);
+
+  // Simulate participant cursor movements
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const cleanup = simulateParticipantCursor(sessionId, (updatedParticipant) => {
+      setParticipants((prev) => 
+        prev.map(p => p.id === updatedParticipant.id ? updatedParticipant : p)
+      );
+    });
+
+    return cleanup;
+  }, [sessionId]);
 
   // Simulate participant joining
   useEffect(() => {
@@ -216,6 +230,7 @@ const InterviewRoom = () => {
             code={code}
             language={language}
             onChange={handleCodeChange}
+            remoteCursors={participants}
           />
         </div>
 
