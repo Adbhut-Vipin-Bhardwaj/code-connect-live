@@ -1,10 +1,15 @@
 import { v4 as uuidv4 } from 'uuid';
 
+// API Configuration
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_VERSION = 'v1';
+const BASE_URL = `${API_URL}/${API_VERSION}`;
+
 // Types
 export interface Session {
   id: string;
   title: string;
-  createdAt: Date;
+  createdAt: Date | string;
   language: string;
   code: string;
 }
@@ -31,103 +36,42 @@ export interface CodeExecutionResult {
   executionTime: number;
 }
 
-// Mock data storage
-const sessions = new Map<string, Session>();
+// Local storage for participants (until WebSocket implementation)
 const sessionParticipants = new Map<string, Participant[]>();
 
-// Simulated latency
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+// HTTP helper functions
+async function apiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const url = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint}`;
+  
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  });
 
-// Default code templates
-const defaultCode: Record<string, string> = {
-  javascript: `// Welcome to the coding interview!
-// Write your solution below
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(error.error || error.detail?.error || 'API request failed');
+  }
 
-function solution(input) {
-  // Your code here
-  return input;
+  return response.json();
 }
-
-// Test your solution
-console.log(solution("Hello, World!"));
-`,
-  python: `# Welcome to the coding interview!
-# Write your solution below
-
-def solution(input):
-    # Your code here
-    return input
-
-# Test your solution
-print(solution("Hello, World!"))
-`,
-  typescript: `// Welcome to the coding interview!
-// Write your solution below
-
-function solution(input: string): string {
-  // Your code here
-  return input;
-}
-
-// Test your solution
-console.log(solution("Hello, World!"));
-`,
-  java: `// Welcome to the coding interview!
-// Write your solution below
-
-public class Solution {
-    public static String solution(String input) {
-        // Your code here
-        return input;
-    }
-    
-    public static void main(String[] args) {
-        System.out.println(solution("Hello, World!"));
-    }
-}
-`,
-  cpp: `// Welcome to the coding interview!
-// Write your solution below
-
-#include <iostream>
-#include <string>
-
-std::string solution(std::string input) {
-    // Your code here
-    return input;
-}
-
-int main() {
-    std::cout << solution("Hello, World!") << std::endl;
-    return 0;
-}
-`,
-};
 
 // Participant colors for cursor indicators
 const participantColors = ['#00d4ff', '#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3'];
 
-// Mock participant names and avatars
-const mockParticipants: Omit<Participant, 'id' | 'isOnline'>[] = [
-  { name: 'Alex Chen', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alex', color: participantColors[0] },
-  { name: 'Sarah Miller', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sarah', color: participantColors[1] },
-  { name: 'Jordan Lee', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=jordan', color: participantColors[2] },
-];
-
 // API Functions
 
 export async function createSession(title: string, language: string = 'javascript'): Promise<Session> {
-  await delay(300);
-  
-  const session: Session = {
-    id: uuidv4(),
-    title,
-    createdAt: new Date(),
-    language,
-    code: defaultCode[language] || defaultCode.javascript,
-  };
-  
-  sessions.set(session.id, session);
+  const response = await apiRequest<Session>('/sessions', {
+    method: 'POST',
+    body: JSON.stringify({ title, language }),
+  });
   
   // Add initial participant (the creator)
   const creator: Participant = {
@@ -137,69 +81,66 @@ export async function createSession(title: string, language: string = 'javascrip
     color: participantColors[3],
     isOnline: true,
   };
-  sessionParticipants.set(session.id, [creator]);
+  sessionParticipants.set(response.id, [creator]);
   
-  return session;
+  return {
+    ...response,
+    createdAt: new Date(response.createdAt),
+  };
 }
 
 export async function getSession(sessionId: string): Promise<Session | null> {
-  await delay(200);
-  
-  // Create a mock session if it doesn't exist (simulating joining via link)
-  if (!sessions.has(sessionId)) {
-    const session: Session = {
-      id: sessionId,
-      title: 'Interview Session',
-      createdAt: new Date(),
-      language: 'javascript',
-      code: defaultCode.javascript,
-    };
-    sessions.set(sessionId, session);
+  try {
+    const session = await apiRequest<Session>(`/sessions/${sessionId}`, {
+      method: 'GET',
+    });
     
-    // Add some mock participants
-    const participants: Participant[] = mockParticipants.slice(0, 2).map(p => ({
-      ...p,
-      id: uuidv4(),
-      isOnline: true,
-    }));
-    sessionParticipants.set(sessionId, participants);
+    // Initialize participants if not already set
+    if (!sessionParticipants.has(sessionId)) {
+      const mockParticipants: Omit<Participant, 'id' | 'isOnline'>[] = [
+        { name: 'Alex Chen', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alex', color: participantColors[0] },
+        { name: 'Sarah Miller', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sarah', color: participantColors[1] },
+      ];
+      
+      const participants: Participant[] = mockParticipants.map(p => ({
+        ...p,
+        id: uuidv4(),
+        isOnline: true,
+      }));
+      sessionParticipants.set(sessionId, participants);
+    }
+    
+    return {
+      ...session,
+      createdAt: new Date(session.createdAt),
+    };
+  } catch (error) {
+    console.error('Error fetching session:', error);
+    return null;
   }
-  
-  return sessions.get(sessionId) || null;
 }
 
 export async function updateSessionCode(sessionId: string, code: string): Promise<void> {
-  await delay(50);
-  
-  const session = sessions.get(sessionId);
-  if (session) {
-    session.code = code;
-    sessions.set(sessionId, session);
-  }
+  await apiRequest(`/sessions/${sessionId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ code }),
+  });
 }
 
 export async function updateSessionLanguage(sessionId: string, language: string): Promise<string> {
-  await delay(100);
+  const response = await apiRequest<{ code: string }>(`/sessions/${sessionId}/language`, {
+    method: 'PUT',
+    body: JSON.stringify({ language }),
+  });
   
-  const session = sessions.get(sessionId);
-  if (session) {
-    session.language = language;
-    session.code = defaultCode[language] || defaultCode.javascript;
-    sessions.set(sessionId, session);
-    return session.code;
-  }
-  
-  return defaultCode[language] || defaultCode.javascript;
+  return response.code;
 }
 
 export async function getParticipants(sessionId: string): Promise<Participant[]> {
-  await delay(150);
   return sessionParticipants.get(sessionId) || [];
 }
 
 export async function joinSession(sessionId: string, name: string): Promise<Participant> {
-  await delay(200);
-  
   const existingParticipants = sessionParticipants.get(sessionId) || [];
   const colorIndex = existingParticipants.length % participantColors.length;
   
@@ -219,41 +160,13 @@ export async function joinSession(sessionId: string, name: string): Promise<Part
 }
 
 export async function executeCode(code: string, language: string): Promise<CodeExecutionResult> {
-  await delay(800); // Simulate execution time
-  
   try {
-    if (language === 'javascript' || language === 'typescript') {
-      // Create a sandboxed execution environment
-      const logs: string[] = [];
-      const mockConsole = {
-        log: (...args: any[]) => logs.push(args.map(a => String(a)).join(' ')),
-        error: (...args: any[]) => logs.push(`Error: ${args.map(a => String(a)).join(' ')}`),
-        warn: (...args: any[]) => logs.push(`Warning: ${args.map(a => String(a)).join(' ')}`),
-      };
-      
-      // Very basic sandboxed eval (for demo purposes)
-      const sandboxedCode = `
-        (function(console) {
-          ${code}
-        })
-      `;
-      
-      const fn = eval(sandboxedCode);
-      fn(mockConsole);
-      
-      return {
-        success: true,
-        output: logs.join('\n') || 'Code executed successfully (no output)',
-        executionTime: Math.random() * 100 + 50,
-      };
-    } else {
-      // For other languages, return mock output
-      return {
-        success: true,
-        output: `[${language}] Code executed successfully!\nOutput: Hello, World!`,
-        executionTime: Math.random() * 200 + 100,
-      };
-    }
+    const result = await apiRequest<CodeExecutionResult>('/execute', {
+      method: 'POST',
+      body: JSON.stringify({ code, language }),
+    });
+    
+    return result;
   } catch (error) {
     return {
       success: false,
@@ -264,7 +177,7 @@ export async function executeCode(code: string, language: string): Promise<CodeE
   }
 }
 
-// Real-time simulation helpers
+// Real-time simulation helpers (until WebSocket implementation)
 export function simulateParticipantCursor(
   sessionId: string, 
   callback: (participant: Participant) => void
@@ -291,10 +204,15 @@ export function simulateParticipantJoin(
   sessionId: string,
   callback: (participant: Participant) => void
 ): () => void {
+  const mockParticipant = {
+    name: 'Jordan Lee',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=jordan',
+    color: participantColors[2],
+  };
+  
   const timeout = setTimeout(() => {
-    const unusedParticipant = mockParticipants[2];
     const newParticipant: Participant = {
-      ...unusedParticipant,
+      ...mockParticipant,
       id: uuidv4(),
       isOnline: true,
     };

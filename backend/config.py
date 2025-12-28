@@ -20,7 +20,9 @@ HOST = "0.0.0.0"
 PORT = 3000
 
 # CORS configuration
-CORS_ORIGINS = ["*"]  # Configure appropriately for production
+# GitHub Codespaces uses forwarded ports with specific URLs
+# Allow all origins for development (configure appropriately for production)
+CORS_ORIGINS = ["*"]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = ["*"]
 CORS_ALLOW_HEADERS = ["*"]
