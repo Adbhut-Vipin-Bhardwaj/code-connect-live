@@ -124,16 +124,43 @@ curl -X POST http://localhost:3000/v1/sessions/{sessionId}/participants \
 
 ## Testing
 
-Run the test script:
+The backend includes integration tests that verify all API endpoints.
+
+### Prerequisites
+
+1. Make sure the server is running on port 3000:
+   ```bash
+   uv run python main.py
+   ```
+
+2. In a separate terminal, run the tests:
+
+### Run with pytest (recommended)
 
 ```bash
-# Start the server first
-uv run python main.py &
+# Install test dependencies (included in pyproject.toml)
+uv sync
 
-# Run tests (requires requests library)
-uv add requests
+# Run all tests with verbose output
+uv run pytest test_api.py -v
+
+# Run specific test
+uv run pytest test_api.py::test_create_session -v
+```
+
+### Run standalone
+
+```bash
 uv run python test_api.py
 ```
+
+### What's tested
+
+- ✅ Session creation
+- ✅ Session retrieval
+- ✅ Code updates
+- ✅ Participant joining
+- ✅ Code execution (Python, JavaScript, etc.)
 
 ## Production Deployment
 

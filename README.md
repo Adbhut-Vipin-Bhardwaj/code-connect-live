@@ -78,6 +78,54 @@ npm run build        # Production build
 npm run lint         # Lint code
 ```
 
+## Testing
+
+### Backend Integration Tests
+
+The backend has pytest-based integration tests that verify all API endpoints:
+
+```bash
+cd backend
+
+# Install dependencies (if not already done)
+uv sync
+
+# Make sure the server is running on port 3000
+# In another terminal: uv run python main.py
+
+# Run tests with pytest
+uv run pytest test_api.py -v
+
+# Or run tests standalone
+uv run python test_api.py
+```
+
+Tests cover:
+- Creating sessions
+- Getting session details
+- Updating code
+- Joining sessions
+- Code execution
+
+### Frontend Tests
+
+Run unit and component tests with Vitest:
+
+```bash
+cd frontend
+
+# Install dependencies (if not already done)
+npm install
+
+# Run tests
+npm test
+```
+
+Tests cover:
+- Component rendering and interactions
+- API service functions
+- User interactions with UI components
+
 ## Environment Variables
 
 ### Frontend (.env)
