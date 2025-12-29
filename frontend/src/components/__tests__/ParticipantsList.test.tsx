@@ -47,7 +47,7 @@ describe('ParticipantsList', () => {
       </TooltipProvider>
     );
     
-    const usersIcon = screen.getByRole('img', { hidden: true });
+    const usersIcon = screen.getByLabelText('Users');
     expect(usersIcon).toBeInTheDocument();
   });
 
@@ -58,10 +58,10 @@ describe('ParticipantsList', () => {
       </TooltipProvider>
     );
     
-    const avatars = screen.getAllByRole('img');
-    // Filter out the Users icon
-    const participantAvatars = avatars.filter(img => img.getAttribute('alt'));
-    expect(participantAvatars.length).toBe(3);
+    // Verify all participant initials are rendered as fallbacks
+    expect(screen.getByText('A')).toBeInTheDocument();
+    expect(screen.getByText('B')).toBeInTheDocument();
+    expect(screen.getByText('C')).toBeInTheDocument();
   });
 
   it('shows overflow indicator when more than 5 participants', () => {

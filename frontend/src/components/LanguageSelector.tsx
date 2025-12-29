@@ -21,11 +21,20 @@ const languages = [
 ];
 
 export function LanguageSelector({ value, onChange }: LanguageSelectorProps) {
+  const selectedLanguage = languages.find(lang => lang.value === value);
+  
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger className="w-[180px] border-border bg-secondary text-secondary-foreground">
         <Code2 className="mr-2 h-4 w-4 text-primary" />
-        <SelectValue placeholder="Select language" />
+        <SelectValue placeholder="Select language">
+          {selectedLanguage && (
+            <span className="flex items-center gap-2">
+              <span>{selectedLanguage.icon}</span>
+              <span>{selectedLanguage.label}</span>
+            </span>
+          )}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent className="border-border bg-popover">
         {languages.map((lang) => (
