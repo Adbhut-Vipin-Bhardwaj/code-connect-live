@@ -1,5 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
-
 // API Configuration
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 const API_VERSION = 'v1';
@@ -36,16 +34,10 @@ export interface CodeExecutionResult {
   executionTime: number;
 }
 
-// Local storage for participants (until WebSocket implementation)
-const sessionParticipants = new Map<string, Participant[]>();
-
 // HTTP helper functions
-async function apiRequest<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint}`;
-  
+
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -62,9 +54,6 @@ async function apiRequest<T>(
   return response.json();
 }
 
-// Participant colors for cursor indicators
-const participantColors = ['#00d4ff', '#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3'];
-
 // API Functions
 
 export async function createSession(title: string, language: string = 'javascript'): Promise<Session> {
@@ -72,17 +61,7 @@ export async function createSession(title: string, language: string = 'javascrip
     method: 'POST',
     body: JSON.stringify({ title, language }),
   });
-  
-  // Add initial participant (the creator)
-  const creator: Participant = {
-    id: uuidv4(),
-    name: 'You (Host)',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=host',
-    color: participantColors[3],
-    isOnline: true,
-  };
-  sessionParticipants.set(response.id, [creator]);
-  
+
   return {
     ...response,
     createdAt: new Date(response.createdAt),
@@ -94,22 +73,7 @@ export async function getSession(sessionId: string): Promise<Session | null> {
     const session = await apiRequest<Session>(`/sessions/${sessionId}`, {
       method: 'GET',
     });
-    
-    // Initialize participants if not already set
-    if (!sessionParticipants.has(sessionId)) {
-      const mockParticipants: Omit<Participant, 'id' | 'isOnline'>[] = [
-        { name: 'Alex Chen', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alex', color: participantColors[0] },
-        { name: 'Sarah Miller', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sarah', color: participantColors[1] },
-      ];
-      
-      const participants: Participant[] = mockParticipants.map(p => ({
-        ...p,
-        id: uuidv4(),
-        isOnline: true,
-      }));
-      sessionParticipants.set(sessionId, participants);
-    }
-    
+
     return {
       ...session,
       createdAt: new Date(session.createdAt),
@@ -132,31 +96,21 @@ export async function updateSessionLanguage(sessionId: string, language: string)
     method: 'PUT',
     body: JSON.stringify({ language }),
   });
-  
+
   return response.code;
 }
 
 export async function getParticipants(sessionId: string): Promise<Participant[]> {
-  return sessionParticipants.get(sessionId) || [];
+  return apiRequest<Participant[]>(`/sessions/${sessionId}/participants`, {
+    method: 'GET',
+  });
 }
 
 export async function joinSession(sessionId: string, name: string): Promise<Participant> {
-  const existingParticipants = sessionParticipants.get(sessionId) || [];
-  const colorIndex = existingParticipants.length % participantColors.length;
-  
-  const participant: Participant = {
-    id: uuidv4(),
-    name,
-    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
-    color: participantColors[colorIndex],
-    isOnline: true,
-  };
-  
-  const participants = sessionParticipants.get(sessionId) || [];
-  participants.push(participant);
-  sessionParticipants.set(sessionId, participants);
-  
-  return participant;
+  return apiRequest<Participant>(`/sessions/${sessionId}/participants`, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
 }
 
 export async function executeCode(code: string, language: string): Promise<CodeExecutionResult> {
@@ -165,7 +119,7 @@ export async function executeCode(code: string, language: string): Promise<CodeE
       method: 'POST',
       body: JSON.stringify({ code, language }),
     });
-    
+
     return result;
   } catch (error) {
     return {
@@ -177,53 +131,27 @@ export async function executeCode(code: string, language: string): Promise<CodeE
   }
 }
 
-// Real-time simulation helpers (until WebSocket implementation)
-export function simulateParticipantCursor(
-  sessionId: string, 
-  callback: (participant: Participant) => void
-): () => void {
-  const interval = setInterval(() => {
-    const participants = sessionParticipants.get(sessionId) || [];
-    const otherParticipants = participants.filter(p => !p.name.includes('You'));
-    
-    if (otherParticipants.length > 0) {
-      const randomParticipant = otherParticipants[Math.floor(Math.random() * otherParticipants.length)];
-      randomParticipant.cursor = {
-        lineNumber: Math.floor(Math.random() * 15) + 1,
-        column: Math.floor(Math.random() * 40) + 1,
-      };
-      randomParticipant.isTyping = Math.random() > 0.3;
-      callback({ ...randomParticipant });
-    }
-  }, 2000);
-  
-  return () => clearInterval(interval);
-}
-
-export function simulateParticipantJoin(
+export function subscribeToParticipants(
   sessionId: string,
-  callback: (participant: Participant) => void
+  onMessage: (participants: Participant[]) => void,
+  onError?: () => void
 ): () => void {
-  const mockParticipant = {
-    name: 'Jordan Lee',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=jordan',
-    color: participantColors[2],
-  };
-  
-  const timeout = setTimeout(() => {
-    const newParticipant: Participant = {
-      ...mockParticipant,
-      id: uuidv4(),
-      isOnline: true,
-    };
-    
-    const participants = sessionParticipants.get(sessionId) || [];
-    if (!participants.some(p => p.name === newParticipant.name)) {
-      participants.push(newParticipant);
-      sessionParticipants.set(sessionId, participants);
-      callback(newParticipant);
+  const url = `${BASE_URL}/sessions/${sessionId}/participants/stream`;
+  const eventSource = new EventSource(url);
+
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data) as Participant[];
+      onMessage(data);
+    } catch (error) {
+      console.error('Failed to parse participants stream', error);
     }
-  }, 5000);
-  
-  return () => clearTimeout(timeout);
+  };
+
+  eventSource.onerror = () => {
+    eventSource.close();
+    if (onError) onError();
+  };
+
+  return () => eventSource.close();
 }

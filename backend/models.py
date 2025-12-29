@@ -51,6 +51,13 @@ class JoinSessionRequest(BaseModel):
     name: str
 
 
+class UpdateParticipantRequest(BaseModel):
+    """Request model for updating participant activity."""
+    cursor: Optional[CursorPosition] = None
+    isTyping: Optional[bool] = None
+    isOnline: Optional[bool] = None
+
+
 class ExecuteCodeRequest(BaseModel):
     """Request model for code execution."""
     code: str

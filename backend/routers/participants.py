@@ -1,11 +1,15 @@
 """API router for participant management endpoints."""
 
-from fastapi import APIRouter, HTTPException, status
-from typing import List
+import asyncio
+import json
 import uuid
+from typing import List
 
-from models import Participant, JoinSessionRequest
+from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import StreamingResponse
+
 import database
+from models import JoinSessionRequest, Participant, UpdateParticipantRequest
 from utils import generate_avatar_url, generate_color
 
 router = APIRouter(prefix="/v1/sessions", tags=["participants"])
@@ -53,3 +57,54 @@ def join_session(sessionId: str, request: JoinSessionRequest):
     
     database.add_participant(sessionId, participant_data)
     return participant_data
+
+
+@router.patch("/{sessionId}/participants/{participantId}", response_model=Participant)
+def update_participant(sessionId: str, participantId: str, request: UpdateParticipantRequest):
+    """Update participant activity (cursor, typing, online)."""
+    session = database.get_session(sessionId)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "Session not found", "code": 404}
+        )
+
+    participant = database.update_participant(sessionId, participantId, request.dict())
+    if not participant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "Participant not found", "code": 404}
+        )
+
+    return participant
+
+
+@router.get("/{sessionId}/participants/stream")
+async def stream_participants(sessionId: str):
+    """Server-sent events stream of participant list for basic real-time updates."""
+    session = database.get_session(sessionId)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "Session not found", "code": 404}
+        )
+
+    async def event_generator():
+        last_payload = None
+        try:
+            while True:
+                participant_list = database.get_participants(sessionId)
+                payload = json.dumps(participant_list)
+                if payload != last_payload:
+                    last_payload = payload
+                    yield f"data: {payload}\n\n"
+                await asyncio.sleep(2)
+        except asyncio.CancelledError:
+            # Client disconnected
+            return
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+    )

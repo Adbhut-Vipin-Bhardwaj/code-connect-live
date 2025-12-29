@@ -43,6 +43,18 @@ def add_participant(session_id: str, participant_data: Dict[str, Any]) -> None:
     participants[session_id].append(participant_data)
 
 
+def update_participant(session_id: str, participant_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+    """Update participant fields like cursor or online status."""
+    session_participants = participants.get(session_id, [])
+    for participant in session_participants:
+        if participant.get("id") == participant_id:
+            for key, value in updates.items():
+                if value is not None:
+                    participant[key] = value
+            return participant
+    return None
+
+
 def participant_exists(session_id: str, name: str) -> bool:
     """Check if a participant with the given name exists in the session."""
     session_participants = participants.get(session_id, [])

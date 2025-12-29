@@ -11,9 +11,9 @@ import {
   updateSessionCode,
   updateSessionLanguage,
   getParticipants,
+  joinSession,
   executeCode,
-  simulateParticipantCursor,
-  simulateParticipantJoin,
+  subscribeToParticipants,
   Session,
   Participant,
   CodeExecutionResult,
@@ -76,30 +76,15 @@ const InterviewRoom = () => {
     loadSession();
   }, [sessionId, navigate, toast]);
 
-  // Simulate participant cursor movements
+  // Real-time participant updates via server-sent events
   useEffect(() => {
     if (!sessionId) return;
 
-    const cleanup = simulateParticipantCursor(sessionId, (updatedParticipant) => {
-      setParticipants((prev) => 
-        prev.map(p => p.id === updatedParticipant.id ? updatedParticipant : p)
-      );
-    });
-
-    return cleanup;
-  }, [sessionId]);
-
-  // Simulate participant joining
-  useEffect(() => {
-    if (!sessionId) return;
-
-    const cleanup = simulateParticipantJoin(sessionId, (newParticipant) => {
-      setParticipants((prev) => [...prev, newParticipant]);
-      toast({
-        title: `${newParticipant.name} joined`,
-        description: 'A new participant has joined the session.',
-      });
-    });
+    const cleanup = subscribeToParticipants(
+      sessionId,
+      (liveParticipants) => setParticipants(liveParticipants),
+      () => toast({ title: 'Connection lost', description: 'Reconnecting to participants stream.', variant: 'destructive' })
+    );
 
     return cleanup;
   }, [sessionId, toast]);
@@ -113,6 +98,25 @@ const InterviewRoom = () => {
     },
     [sessionId]
   );
+
+  // Ensure current visitor is registered as a participant for this session
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const storageKey = `ccl-participant-${sessionId}`;
+    let participantName = localStorage.getItem(storageKey);
+
+    if (!participantName) {
+      participantName = `Guest-${Math.random().toString(36).slice(2, 7)}`;
+      localStorage.setItem(storageKey, participantName);
+    }
+
+    joinSession(sessionId, participantName).catch((error) => {
+      // Ignore conflict errors when the participant already exists
+      if (error instanceof Error && error.message.includes('already exists')) return;
+      console.error('Failed to join session', error);
+    });
+  }, [sessionId]);
 
   const handleLanguageChange = useCallback(
     async (newLanguage: string) => {
