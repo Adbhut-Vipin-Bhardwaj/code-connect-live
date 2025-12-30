@@ -96,6 +96,31 @@ export async function updateSessionLanguage(sessionId: string, language: string)
   return response.code;
 }
 
+export function subscribeToSession(
+  sessionId: string,
+  onMessage: (payload: { code: string; language: string }) => void,
+  onError?: () => void
+): () => void {
+  const url = `${BASE_URL}/sessions/${sessionId}/stream`;
+  const eventSource = new EventSource(url);
+
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data) as { code: string; language: string };
+      onMessage(data);
+    } catch (error) {
+      console.error('Failed to parse session stream', error);
+    }
+  };
+
+  eventSource.onerror = () => {
+    eventSource.close();
+    if (onError) onError();
+  };
+
+  return () => eventSource.close();
+}
+
 export async function getParticipants(sessionId: string): Promise<Participant[]> {
   return apiRequest<Participant[]>(`/sessions/${sessionId}/participants`, {
     method: 'GET',

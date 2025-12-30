@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { CodeEditor } from '@/components/CodeEditor';
 import { LanguageSelector } from '@/components/LanguageSelector';
@@ -13,6 +13,7 @@ import {
   getParticipants,
   joinSession,
   executeCode,
+  subscribeToSession,
   subscribeToParticipants,
   Session,
   Participant,
@@ -33,6 +34,7 @@ const InterviewRoom = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionResult, setExecutionResult] = useState<CodeExecutionResult | null>(null);
+  const codeUpdateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load session data
   useEffect(() => {
@@ -90,14 +92,54 @@ const InterviewRoom = () => {
   }, [sessionId, toast]);
 
   const handleCodeChange = useCallback(
-    async (newCode: string) => {
+    (newCode: string) => {
       setCode(newCode);
-      if (sessionId) {
-        await updateSessionCode(sessionId, newCode);
+
+      if (!sessionId) return;
+
+      if (codeUpdateTimer.current) {
+        clearTimeout(codeUpdateTimer.current);
       }
+
+      codeUpdateTimer.current = setTimeout(() => {
+        updateSessionCode(sessionId, newCode).catch((error) => {
+          console.error('Failed to sync code', error);
+          toast({ title: 'Sync issue', description: 'Unable to save code changes.', variant: 'destructive' });
+        });
+      }, 400);
     },
-    [sessionId]
+    [sessionId, toast]
   );
+
+  // Stream code/language changes from server for live updates
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const cleanup = subscribeToSession(
+      sessionId,
+      ({ code: incomingCode, language: incomingLanguage }) => {
+        setCode((prev) => (incomingCode !== undefined && incomingCode !== prev ? incomingCode : prev));
+        setLanguage((prev) => (incomingLanguage && incomingLanguage !== prev ? incomingLanguage : prev));
+      },
+      () =>
+        toast({
+          title: 'Live updates lost',
+          description: 'Reconnecting to session updates.',
+          variant: 'destructive',
+        })
+    );
+
+    return cleanup;
+  }, [sessionId, toast]);
+
+  // Cleanup pending code sync timer on unmount
+  useEffect(() => {
+    return () => {
+      if (codeUpdateTimer.current) {
+        clearTimeout(codeUpdateTimer.current);
+      }
+    };
+  }, []);
 
   // Ensure current visitor is registered as a participant for this session
   useEffect(() => {

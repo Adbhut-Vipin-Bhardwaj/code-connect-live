@@ -1,8 +1,12 @@
 """API router for session management endpoints."""
 
-from fastapi import APIRouter, HTTPException, status
-from datetime import datetime
+import asyncio
+import json
 import uuid
+from datetime import datetime
+
+from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import StreamingResponse
 
 from models import Session, CreateSessionRequest, UpdateCodeRequest, UpdateLanguageRequest
 from config import DEFAULT_CODE, SUPPORTED_LANGUAGES
@@ -87,3 +91,41 @@ def update_session_language(sessionId: str, request: UpdateLanguageRequest):
     database.update_session_language(sessionId, request.language, new_code)
     
     return {"code": new_code}
+
+
+@router.get("/{sessionId}/stream")
+async def stream_session(sessionId: str):
+    """Server-sent events stream for session code/language changes."""
+    session = database.get_session(sessionId)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "Session not found", "code": 404}
+        )
+
+    async def event_generator():
+        last_payload = None
+        try:
+            while True:
+                current_session = database.get_session(sessionId)
+                if not current_session:
+                    break
+
+                payload = json.dumps({
+                    "code": current_session.get("code", ""),
+                    "language": current_session.get("language", "javascript"),
+                })
+
+                if payload != last_payload:
+                    last_payload = payload
+                    yield f"data: {payload}\n\n"
+
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            return
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+    )
