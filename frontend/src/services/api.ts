@@ -1,3 +1,6 @@
+import { executeInBrowser } from './wasmExecutor';
+import type { CodeExecutionResult } from './types';
+
 // API Configuration
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 const API_VERSION = 'v1';
@@ -25,13 +28,6 @@ export interface Participant {
   isOnline: boolean;
   cursor?: CursorPosition;
   isTyping?: boolean;
-}
-
-export interface CodeExecutionResult {
-  success: boolean;
-  output: string;
-  error?: string;
-  executionTime: number;
 }
 
 // HTTP helper functions
@@ -114,21 +110,7 @@ export async function joinSession(sessionId: string, name: string): Promise<Part
 }
 
 export async function executeCode(code: string, language: string): Promise<CodeExecutionResult> {
-  try {
-    const result = await apiRequest<CodeExecutionResult>('/execute', {
-      method: 'POST',
-      body: JSON.stringify({ code, language }),
-    });
-
-    return result;
-  } catch (error) {
-    return {
-      success: false,
-      output: '',
-      error: error instanceof Error ? error.message : 'An error occurred',
-      executionTime: 0,
-    };
-  }
+  return executeInBrowser(code, language);
 }
 
 export function subscribeToParticipants(
@@ -155,3 +137,5 @@ export function subscribeToParticipants(
 
   return () => eventSource.close();
 }
+
+export type { CodeExecutionResult } from './types';

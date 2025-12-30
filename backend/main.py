@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import sessions, participants, execute
+from routers import sessions, participants
 from config import CORS_ORIGINS, CORS_ALLOW_CREDENTIALS, CORS_ALLOW_METHODS, CORS_ALLOW_HEADERS, HOST, PORT
 
 # Initialize FastAPI app
@@ -25,7 +25,6 @@ app.add_middleware(
 # Include routers
 app.include_router(sessions.router)
 app.include_router(participants.router)
-app.include_router(execute.router)
 
 
 @app.get("/")

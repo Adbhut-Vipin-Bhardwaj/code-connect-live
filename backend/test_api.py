@@ -63,19 +63,6 @@ def test_join_session(session_id):
     print(f"Participant ID: {participant['id']}")
     print(f"Participant Name: {participant['name']}")
 
-def test_execute_code():
-    """Test code execution"""
-    response = requests.post(
-        f"{BASE_URL}/execute",
-        json={"code": "print('Hello from Python!')", "language": "python"}
-    )
-    print(f"Execute Code: {response.status_code}")
-    assert response.status_code == 200
-    result = response.json()
-    print(f"Execution Success: {result['success']}")
-    print(f"Output: {result['output']}")
-    print(f"Execution Time: {result['executionTime']}ms")
-
 if __name__ == "__main__":
     print("Testing Code Connect Live API")
     print("=" * 50)

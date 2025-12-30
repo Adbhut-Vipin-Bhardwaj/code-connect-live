@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSession, getSession, executeCode } from '../api';
+import { executeInBrowser } from '../wasmExecutor';
 
 // Mock fetch globally
 global.fetch = vi.fn();
+vi.mock('../wasmExecutor', () => ({ executeInBrowser: vi.fn() }));
 
 describe('API Service', () => {
   beforeEach(() => {
@@ -88,6 +90,8 @@ describe('API Service', () => {
   });
 
   describe('executeCode', () => {
+    const mockedExecuteInBrowser = executeInBrowser as unknown as vi.Mock;
+
     it('executes code successfully', async () => {
       const mockResult = {
         success: true,
@@ -95,23 +99,14 @@ describe('API Service', () => {
         executionTime: 42,
       };
 
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResult,
-      });
+      mockedExecuteInBrowser.mockResolvedValueOnce(mockResult);
 
       const result = await executeCode('print("Hello, World!")', 'python');
 
       expect(result.success).toBe(true);
       expect(result.output).toBe('Hello, World!');
       expect(result.executionTime).toBe(42);
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/execute'),
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ code: 'print("Hello, World!")', language: 'python' }),
-        })
-      );
+      expect(mockedExecuteInBrowser).toHaveBeenCalledWith('print("Hello, World!")', 'python');
     });
 
     it('handles execution errors', async () => {
@@ -122,15 +117,13 @@ describe('API Service', () => {
         executionTime: 5,
       };
 
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockError,
-      });
+      mockedExecuteInBrowser.mockResolvedValueOnce(mockError);
 
       const result = await executeCode('invalid code', 'python');
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('SyntaxError');
+      expect(mockedExecuteInBrowser).toHaveBeenCalledWith('invalid code', 'python');
     });
   });
 });

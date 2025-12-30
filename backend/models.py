@@ -58,20 +58,6 @@ class UpdateParticipantRequest(BaseModel):
     isOnline: Optional[bool] = None
 
 
-class ExecuteCodeRequest(BaseModel):
-    """Request model for code execution."""
-    code: str
-    language: str
-
-
-class CodeExecutionResult(BaseModel):
-    """Model for code execution results."""
-    success: bool
-    output: str
-    error: Optional[str] = None
-    executionTime: float
-
-
 class ErrorResponse(BaseModel):
     """Model for error responses."""
     error: str

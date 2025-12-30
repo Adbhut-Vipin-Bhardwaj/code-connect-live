@@ -4,13 +4,11 @@
 DEFAULT_CODE = {
     "javascript": "// Write your JavaScript code here\nconsole.log('Hello, World!');",
     "python": "# Write your Python code here\nprint('Hello, World!')",
-    "typescript": "// Write your TypeScript code here\nconsole.log('Hello, World!');",
-    "java": "// Write your Java code here\npublic class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hello, World!\");\n    }\n}",
-    "cpp": "// Write your C++ code here\n#include <iostream>\n\nint main() {\n    std::cout << \"Hello, World!\" << std::endl;\n    return 0;\n}"
+    "typescript": "// Write your TypeScript code here\nconsole.log('Hello, World!');"
 }
 
 # Supported programming languages
-SUPPORTED_LANGUAGES = ["javascript", "python", "typescript", "java", "cpp"]
+SUPPORTED_LANGUAGES = ["javascript", "python", "typescript"]
 
 # Execution timeout in seconds
 EXECUTION_TIMEOUT = 5

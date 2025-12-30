@@ -16,8 +16,6 @@ const languages = [
   { value: 'javascript', label: 'JavaScript', icon: '🟨' },
   { value: 'typescript', label: 'TypeScript', icon: '🔷' },
   { value: 'python', label: 'Python', icon: '🐍' },
-  { value: 'java', label: 'Java', icon: '☕' },
-  { value: 'cpp', label: 'C++', icon: '⚡' },
 ];
 
 export function LanguageSelector({ value, onChange }: LanguageSelectorProps) {

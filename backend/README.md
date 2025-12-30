@@ -6,7 +6,7 @@ FastAPI backend for the Code Connect Live collaborative coding platform.
 
 - ✅ Create and manage coding sessions
 - ✅ Multi-language support (Python, JavaScript, TypeScript, Java, C++)
-- ✅ Code execution engine
+- ✅ Participant management
 - ✅ Participant management
 - ✅ RESTful API endpoints
 - ✅ CORS enabled for cross-origin requests
@@ -86,7 +86,7 @@ Once the server is running, visit:
 
 ### Code Execution
 
-- `POST /v1/execute` - Execute code in supported languages
+- Server-side execution endpoints have been removed. Code now runs entirely in-browser via WASM runtimes on the frontend.
 
 ## Supported Languages
 
@@ -210,12 +210,11 @@ The backend uses a modular architecture:
 
 ## Security Considerations
 
-⚠️ **Warning**: The code execution feature runs untrusted code. In production:
-- Implement proper sandboxing (Docker containers, VMs)
-- Add resource limits (CPU, memory, time)
+⚠️ **Warning**: Server-side execution is removed. Code executes in the browser (Pyodide/QuickJS). You should still:
 - Validate and sanitize all inputs
 - Implement rate limiting
 - Use proper authentication and authorization
+- Consider feature flags to disable execution entirely for certain tenants
 
 ## License
 

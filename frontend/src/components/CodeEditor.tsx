@@ -15,8 +15,6 @@ const languageMap: Record<string, string> = {
   javascript: 'javascript',
   typescript: 'typescript',
   python: 'python',
-  java: 'java',
-  cpp: 'cpp',
 };
 
 export function CodeEditor({ code, language, onChange, readOnly = false, remoteCursors = [] }: CodeEditorProps) {
