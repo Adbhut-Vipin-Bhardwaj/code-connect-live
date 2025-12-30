@@ -104,11 +104,11 @@ const InterviewRoom = () => {
     if (!sessionId) return;
 
     const storageKey = `ccl-participant-${sessionId}`;
-    let participantName = localStorage.getItem(storageKey);
+    let participantName = sessionStorage.getItem(storageKey);
 
     if (!participantName) {
       participantName = `Guest-${Math.random().toString(36).slice(2, 7)}`;
-      localStorage.setItem(storageKey, participantName);
+      sessionStorage.setItem(storageKey, participantName);
     }
 
     joinSession(sessionId, participantName).catch((error) => {
