@@ -4,7 +4,22 @@ A collaborative coding platform for interviews and pair programming.
 
 ## Quick Start (GitHub Codespaces)
 
-### 1. Start the Backend
+### Option 1: Run Both Services Together (Recommended)
+
+```bash
+# Install dependencies
+npm run backend:install
+npm run frontend:install
+
+# Run both frontend and backend concurrently
+npm run dev
+```
+
+This will start both services in a single terminal with color-coded output.
+
+### Option 2: Run Services Separately
+
+**Start the Backend:**
 
 ```bash
 cd backend
@@ -14,7 +29,7 @@ uv run python main.py
 
 The backend will run on port 3000.
 
-### 2. Start the Frontend (in a new terminal)
+**Start the Frontend (in a new terminal):**
 
 ```bash
 cd frontend

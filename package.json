@@ -1,0 +1,16 @@
+{
+  "name": "code-connect-live",
+  "version": "1.0.0",
+  "description": "A collaborative coding platform for interviews and pair programming",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\" --names \"backend,frontend\" --prefix-colors \"blue,green\"",
+    "backend": "cd backend && uv sync && uv run python main.py",
+    "frontend": "cd frontend && npm run dev",
+    "backend:install": "cd backend && uv sync",
+    "frontend:install": "cd frontend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
