@@ -30,6 +30,10 @@ export interface Participant {
   isTyping?: boolean;
 }
 
+type ParticipantUpdate = Partial<
+  Pick<Participant, 'cursor' | 'isTyping' | 'isOnline'>
+> & { cursor?: CursorPosition };
+
 // HTTP helper functions
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint}`;
@@ -131,6 +135,17 @@ export async function joinSession(sessionId: string, name: string): Promise<Part
   return apiRequest<Participant>(`/sessions/${sessionId}/participants`, {
     method: 'POST',
     body: JSON.stringify({ name }),
+  });
+}
+
+export async function updateParticipant(
+  sessionId: string,
+  participantId: string,
+  payload: ParticipantUpdate
+): Promise<Participant> {
+  return apiRequest<Participant>(`/sessions/${sessionId}/participants/${participantId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
   });
 }
 

@@ -12,6 +12,7 @@ import {
   updateSessionLanguage,
   getParticipants,
   joinSession,
+  updateParticipant,
   executeCode,
   subscribeToSession,
   subscribeToParticipants,
@@ -35,6 +36,9 @@ const InterviewRoom = () => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionResult, setExecutionResult] = useState<CodeExecutionResult | null>(null);
   const codeUpdateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cursorUpdateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestCursorRef = useRef<{ lineNumber: number; column: number } | null>(null);
+  const [currentParticipantId, setCurrentParticipantId] = useState<string | null>(null);
 
   // Load session data
   useEffect(() => {
@@ -132,11 +136,44 @@ const InterviewRoom = () => {
     return cleanup;
   }, [sessionId, toast]);
 
+  const handleCursorChange = useCallback(
+    (position: { lineNumber: number; column: number }) => {
+      if (!sessionId || !currentParticipantId) return;
+
+      latestCursorRef.current = position;
+
+      setParticipants((prev) =>
+        prev.map((participant) =>
+          participant.id === currentParticipantId ? { ...participant, cursor: position } : participant
+        )
+      );
+
+      if (cursorUpdateTimer.current) {
+        clearTimeout(cursorUpdateTimer.current);
+      }
+
+      cursorUpdateTimer.current = setTimeout(() => {
+        if (!latestCursorRef.current) return;
+        updateParticipant(sessionId, currentParticipantId, {
+          cursor: latestCursorRef.current,
+          isOnline: true,
+        }).catch((error) => {
+          console.error('Failed to update cursor', error);
+        });
+        cursorUpdateTimer.current = null;
+      }, 150);
+    },
+    [sessionId, currentParticipantId]
+  );
+
   // Cleanup pending code sync timer on unmount
   useEffect(() => {
     return () => {
       if (codeUpdateTimer.current) {
         clearTimeout(codeUpdateTimer.current);
+      }
+      if (cursorUpdateTimer.current) {
+        clearTimeout(cursorUpdateTimer.current);
       }
     };
   }, []);
@@ -146,18 +183,55 @@ const InterviewRoom = () => {
     if (!sessionId) return;
 
     const storageKey = `ccl-participant-${sessionId}`;
-    let participantName = sessionStorage.getItem(storageKey);
+    const storedValue = sessionStorage.getItem(storageKey);
+    let participantName: string | null = null;
+    let participantId: string | null = null;
+
+    if (storedValue) {
+      try {
+        const parsed = JSON.parse(storedValue) as { id?: string; name?: string };
+        participantName = parsed.name || null;
+        participantId = parsed.id || null;
+      } catch {
+        participantName = storedValue;
+      }
+    }
 
     if (!participantName) {
       participantName = `Guest-${Math.random().toString(36).slice(2, 7)}`;
-      sessionStorage.setItem(storageKey, participantName);
+      sessionStorage.setItem(storageKey, JSON.stringify({ name: participantName }));
     }
 
-    joinSession(sessionId, participantName).catch((error) => {
-      // Ignore conflict errors when the participant already exists
-      if (error instanceof Error && error.message.includes('already exists')) return;
-      console.error('Failed to join session', error);
-    });
+    if (participantId) {
+      setCurrentParticipantId(participantId);
+    }
+
+    const ensureParticipant = async () => {
+      try {
+        const participant = await joinSession(sessionId, participantName!);
+        setCurrentParticipantId(participant.id);
+        sessionStorage.setItem(storageKey, JSON.stringify({ id: participant.id, name: participant.name }));
+        setParticipants((prev) => {
+          const alreadyPresent = prev.some((p) => p.id === participant.id);
+          return alreadyPresent ? prev : [...prev, participant];
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (message.includes('already exists')) {
+          const existingList = await getParticipants(sessionId);
+          setParticipants(existingList);
+          const existing = existingList.find((p) => p.name === participantName);
+          if (existing) {
+            setCurrentParticipantId(existing.id);
+            sessionStorage.setItem(storageKey, JSON.stringify({ id: existing.id, name: existing.name }));
+          }
+        } else {
+          console.error('Failed to join session', error);
+        }
+      }
+    };
+
+    ensureParticipant();
   }, [sessionId]);
 
   const handleLanguageChange = useCallback(
@@ -276,7 +350,8 @@ const InterviewRoom = () => {
             code={code}
             language={language}
             onChange={handleCodeChange}
-            remoteCursors={participants}
+            onCursorChange={handleCursorChange}
+            remoteCursors={participants.filter((p) => p.id !== currentParticipantId)}
           />
         </div>
 

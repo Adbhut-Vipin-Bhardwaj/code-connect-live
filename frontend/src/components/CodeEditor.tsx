@@ -9,6 +9,7 @@ interface CodeEditorProps {
   onChange: (value: string) => void;
   readOnly?: boolean;
   remoteCursors?: Participant[];
+  onCursorChange?: (position: { lineNumber: number; column: number }) => void;
 }
 
 const languageMap: Record<string, string> = {
@@ -17,13 +18,36 @@ const languageMap: Record<string, string> = {
   python: 'python',
 };
 
-export function CodeEditor({ code, language, onChange, readOnly = false, remoteCursors = [] }: CodeEditorProps) {
+export function CodeEditor({
+  code,
+  language,
+  onChange,
+  readOnly = false,
+  remoteCursors = [],
+  onCursorChange,
+}: CodeEditorProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const decorationsRef = useRef<string[]>([]);
+  const cursorListenerRef = useRef<editor.IDisposable | null>(null);
+  const onCursorChangeRef = useRef<CodeEditorProps['onCursorChange']>();
+
+  useEffect(() => {
+    onCursorChangeRef.current = onCursorChange;
+  }, [onCursorChange]);
 
   const handleEditorMount: OnMount = (editor) => {
     editorRef.current = editor;
     editor.focus();
+
+    // Track local cursor position so the parent can sync it
+    cursorListenerRef.current?.dispose();
+    cursorListenerRef.current = editor.onDidChangeCursorPosition((event) => {
+      if (!onCursorChangeRef.current) return;
+      onCursorChangeRef.current({
+        lineNumber: event.position.lineNumber,
+        column: event.position.column,
+      });
+    });
   };
 
   const handleChange = (value: string | undefined) => {
@@ -42,7 +66,7 @@ export function CodeEditor({ code, language, onChange, readOnly = false, remoteC
 
     // Create decorations for each remote cursor
     const newDecorations: editor.IModelDeltaDecoration[] = remoteCursors
-      .filter(p => p.cursor && !p.name.includes('You'))
+      .filter(p => p.cursor)
       .map(participant => {
         const { lineNumber, column } = participant.cursor!;
         
@@ -120,6 +144,12 @@ export function CodeEditor({ code, language, onChange, readOnly = false, remoteC
       `;
     });
   }, [remoteCursors]);
+
+  useEffect(() => {
+    return () => {
+      cursorListenerRef.current?.dispose();
+    };
+  }, []);
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-lg border border-border bg-editor-bg">
