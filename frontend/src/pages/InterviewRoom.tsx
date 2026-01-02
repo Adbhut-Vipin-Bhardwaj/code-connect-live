@@ -35,10 +35,30 @@ const InterviewRoom = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionResult, setExecutionResult] = useState<CodeExecutionResult | null>(null);
+  const [version, setVersion] = useState(0);
   const codeUpdateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cursorUpdateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasLocalPendingRef = useRef(false);
+  const versionRef = useRef(0);
+  const clientIdRef = useRef<string>('');
   const latestCursorRef = useRef<{ lineNumber: number; column: number } | null>(null);
   const [currentParticipantId, setCurrentParticipantId] = useState<string | null>(null);
+
+  // Stable client id per session for echo suppression
+  useEffect(() => {
+    if (!sessionId) return;
+    const storageKey = `ccl-client-${sessionId}`;
+    const existing = sessionStorage.getItem(storageKey);
+    if (existing) {
+      clientIdRef.current = existing;
+      return;
+    }
+    const generated = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `client-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    clientIdRef.current = generated;
+    sessionStorage.setItem(storageKey, generated);
+  }, [sessionId]);
 
   // Load session data
   useEffect(() => {
@@ -59,6 +79,8 @@ const InterviewRoom = () => {
           setCode(sessionData.code);
           setLanguage(sessionData.language);
           setParticipants(participantsData);
+          setVersion(sessionData.version ?? 0);
+          versionRef.current = sessionData.version ?? 0;
         } else {
           toast({
             title: 'Session not found',
@@ -98,6 +120,7 @@ const InterviewRoom = () => {
   const handleCodeChange = useCallback(
     (newCode: string) => {
       setCode(newCode);
+      hasLocalPendingRef.current = true;
 
       if (!sessionId) return;
 
@@ -106,10 +129,33 @@ const InterviewRoom = () => {
       }
 
       codeUpdateTimer.current = setTimeout(() => {
-        updateSessionCode(sessionId, newCode).catch((error) => {
-          console.error('Failed to sync code', error);
-          toast({ title: 'Sync issue', description: 'Unable to save code changes.', variant: 'destructive' });
-        });
+        const baseVersion = versionRef.current;
+
+        updateSessionCode(sessionId, newCode, baseVersion, clientIdRef.current)
+          .then((nextVersion) => {
+            versionRef.current = nextVersion;
+            setVersion(nextVersion);
+          })
+          .catch((error: unknown) => {
+            const err = error as { status?: number; data?: any; message?: string };
+            if (err.status === 409 && err.data) {
+              const conflictVersion = err.data.version ?? baseVersion;
+              const conflictCode = err.data.codeContent ?? newCode;
+              versionRef.current = conflictVersion;
+              setVersion(conflictVersion);
+              setCode(conflictCode);
+              toast({
+                title: 'Update conflict',
+                description: 'Your editor caught up to the latest version.',
+              });
+            } else {
+              console.error('Failed to sync code', error);
+              toast({ title: 'Sync issue', description: 'Unable to save code changes.', variant: 'destructive' });
+            }
+          })
+          .finally(() => {
+            hasLocalPendingRef.current = false;
+          });
       }, 400);
     },
     [sessionId, toast]
@@ -121,9 +167,29 @@ const InterviewRoom = () => {
 
     const cleanup = subscribeToSession(
       sessionId,
-      ({ code: incomingCode, language: incomingLanguage }) => {
-        setCode((prev) => (incomingCode !== undefined && incomingCode !== prev ? incomingCode : prev));
+      ({ code: incomingCode, language: incomingLanguage, version: incomingVersion = 0, sourceClientId }) => {
+        const currentVersion = versionRef.current;
+
+        // Ignore echoes from this client but still advance version if needed
+        if (sourceClientId && sourceClientId === clientIdRef.current) {
+          if (incomingVersion > currentVersion) {
+            versionRef.current = incomingVersion;
+            setVersion(incomingVersion);
+          }
+          return;
+        }
+
+        // Skip stale snapshots
+        if (incomingVersion <= currentVersion) return;
+
+        if (incomingCode !== undefined) {
+          setCode((prev) => (incomingCode !== prev ? incomingCode : prev));
+        }
+
         setLanguage((prev) => (incomingLanguage && incomingLanguage !== prev ? incomingLanguage : prev));
+
+        versionRef.current = incomingVersion;
+        setVersion(incomingVersion);
       },
       () =>
         toast({
@@ -238,12 +304,19 @@ const InterviewRoom = () => {
     async (newLanguage: string) => {
       setLanguage(newLanguage);
       if (sessionId) {
-        const newCode = await updateSessionLanguage(sessionId, newLanguage);
-        setCode(newCode);
-        setExecutionResult(null);
+        try {
+          const { code: newCode, version: nextVersion } = await updateSessionLanguage(sessionId, newLanguage);
+          setCode(newCode);
+          setExecutionResult(null);
+          versionRef.current = nextVersion;
+          setVersion(nextVersion);
+        } catch (error) {
+          console.error('Failed to change language', error);
+          toast({ title: 'Language sync issue', description: 'Unable to switch language right now.', variant: 'destructive' });
+        }
       }
     },
-    [sessionId]
+    [sessionId, toast]
   );
 
   const handleRunCode = async () => {

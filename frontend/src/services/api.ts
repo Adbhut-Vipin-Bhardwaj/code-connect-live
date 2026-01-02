@@ -13,6 +13,8 @@ export interface Session {
   createdAt: Date | string;
   language: string;
   code: string;
+  version: number;
+  lastClientId?: string;
 }
 
 export interface CursorPosition {
@@ -48,7 +50,13 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: response.statusText }));
-    throw new Error(error.error || error.detail?.error || 'API request failed');
+    const err = new Error(error.error || error.detail?.error || 'API request failed') as Error & {
+      status?: number;
+      data?: unknown;
+    };
+    err.status = response.status;
+    err.data = error;
+    throw err;
   }
 
   return response.json();
@@ -84,25 +92,32 @@ export async function getSession(sessionId: string): Promise<Session | null> {
   }
 }
 
-export async function updateSessionCode(sessionId: string, code: string): Promise<void> {
-  await apiRequest(`/sessions/${sessionId}`, {
+export async function updateSessionCode(
+  sessionId: string,
+  code: string,
+  version: number,
+  clientId: string
+): Promise<number> {
+  const response = await apiRequest<{ version: number }>(`/sessions/${sessionId}`, {
     method: 'PUT',
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({ code, version, clientId }),
   });
+
+  return response.version;
 }
 
-export async function updateSessionLanguage(sessionId: string, language: string): Promise<string> {
-  const response = await apiRequest<{ code: string }>(`/sessions/${sessionId}/language`, {
+export async function updateSessionLanguage(sessionId: string, language: string): Promise<{ code: string; version: number }> {
+  const response = await apiRequest<{ code: string; version: number }>(`/sessions/${sessionId}/language`, {
     method: 'PUT',
     body: JSON.stringify({ language }),
   });
 
-  return response.code;
+  return response;
 }
 
 export function subscribeToSession(
   sessionId: string,
-  onMessage: (payload: { code: string; language: string }) => void,
+  onMessage: (payload: { code: string; language: string; version: number; sourceClientId?: string }) => void,
   onError?: () => void
 ): () => void {
   const url = `${BASE_URL}/sessions/${sessionId}/stream`;
@@ -110,7 +125,7 @@ export function subscribeToSession(
 
   eventSource.onmessage = (event) => {
     try {
-      const data = JSON.parse(event.data) as { code: string; language: string };
+      const data = JSON.parse(event.data) as { code: string; language: string; version: number; sourceClientId?: string };
       onMessage(data);
     } catch (error) {
       console.error('Failed to parse session stream', error);

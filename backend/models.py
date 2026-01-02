@@ -28,6 +28,8 @@ class Session(BaseModel):
     createdAt: str
     language: str
     code: str
+    version: int
+    lastClientId: Optional[str] = None
 
 
 class CreateSessionRequest(BaseModel):
@@ -39,6 +41,8 @@ class CreateSessionRequest(BaseModel):
 class UpdateCodeRequest(BaseModel):
     """Request model for updating session code."""
     code: str
+    version: int
+    clientId: str
 
 
 class UpdateLanguageRequest(BaseModel):

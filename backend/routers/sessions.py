@@ -31,7 +31,9 @@ def create_session(request: CreateSessionRequest):
             "title": request.title,
             "createdAt": datetime.utcnow().isoformat() + "Z",
             "language": request.language,
-            "code": DEFAULT_CODE[request.language]
+            "code": DEFAULT_CODE[request.language],
+            "version": 0,
+            "lastClientId": None,
         }
         
         database.create_session(session_id, session_data)
@@ -67,8 +69,22 @@ def update_session_code(sessionId: str, request: UpdateCodeRequest):
             detail={"error": "Session not found", "code": 404}
         )
     
-    database.update_session_code(sessionId, request.code)
-    return {"message": "Code updated successfully"}
+    current_version = session.get("version", 0)
+
+    if request.version != current_version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": "Version conflict",
+                "code": 409,
+                "codeContent": session.get("code", ""),
+                "version": current_version,
+            },
+        )
+
+    new_version = current_version + 1
+    database.update_session_code(sessionId, request.code, new_version, request.clientId)
+    return {"version": new_version}
 
 
 @router.put("/{sessionId}/language")
@@ -88,9 +104,12 @@ def update_session_language(sessionId: str, request: UpdateLanguageRequest):
         )
     
     new_code = DEFAULT_CODE[request.language]
-    database.update_session_language(sessionId, request.language, new_code)
+    current_version = session.get("version", 0)
+    new_version = current_version + 1
+
+    database.update_session_language(sessionId, request.language, new_code, new_version, "server-language-change")
     
-    return {"code": new_code}
+    return {"code": new_code, "version": new_version}
 
 
 @router.get("/{sessionId}/stream")
@@ -114,6 +133,8 @@ async def stream_session(sessionId: str):
                 payload = json.dumps({
                     "code": current_session.get("code", ""),
                     "language": current_session.get("language", "javascript"),
+                    "version": current_session.get("version", 0),
+                    "sourceClientId": current_session.get("lastClientId"),
                 })
 
                 if payload != last_payload:

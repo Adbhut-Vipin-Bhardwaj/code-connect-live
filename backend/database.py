@@ -18,17 +18,21 @@ def create_session(session_id: str, session_data: Dict[str, Any]) -> None:
     participants[session_id] = []
 
 
-def update_session_code(session_id: str, code: str) -> None:
-    """Update the code for a session."""
+def update_session_code(session_id: str, code: str, version: int, client_id: str) -> None:
+    """Update the code, version, and last client for a session."""
     if session_id in sessions:
         sessions[session_id]["code"] = code
+        sessions[session_id]["version"] = version
+        sessions[session_id]["lastClientId"] = client_id
 
 
-def update_session_language(session_id: str, language: str, code: str) -> None:
-    """Update the language for a session."""
+def update_session_language(session_id: str, language: str, code: str, version: int, client_id: str) -> None:
+    """Update the language and code while bumping version and last client."""
     if session_id in sessions:
         sessions[session_id]["language"] = language
         sessions[session_id]["code"] = code
+        sessions[session_id]["version"] = version
+        sessions[session_id]["lastClientId"] = client_id
 
 
 def get_participants(session_id: str) -> List[Dict[str, Any]]:
