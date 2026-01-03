@@ -1,11 +1,21 @@
 # Code Connect Live
 
-A collaborative coding platform for interviews and pair programming.
+Collaborative coding platform for interviews and pair programming. FastAPI powers the session/participant API, while the React + Vite frontend handles the UI and runs code in-browser via WASM (Pyodide for Python, QuickJS + esbuild-wasm for JS/TS).
 
-## Quick Start (GitHub Codespaces)
+## Stack
+- FastAPI on Python 3.12+ with in-memory storage for development
+- React + TypeScript + Vite UI
+- Client-side execution: Pyodide (Python) and QuickJS + esbuild-wasm (JavaScript/TypeScript)
+- Dev scripts orchestrated with npm and uv
 
-### Option 1: Run Both Services Together (Recommended)
+## Prerequisites
+- Node.js 18+ (or Bun)
+- Python 3.12+ with `uv` installed (`pip install uv`)
+- GitHub Codespaces already includes these in the default image
 
+## Quick Start (Codespaces or local)
+
+**Option 1: Run both services together (recommended)**
 ```bash
 # Install dependencies
 npm run backend:install
@@ -14,78 +24,57 @@ npm run frontend:install
 # Run both frontend and backend concurrently
 npm run dev
 ```
+Runs backend on port 3000 and frontend on port 8080 with color-coded logs in one terminal.
 
-This will start both services in a single terminal with color-coded output.
+**Option 2: Run services separately**
 
-### Option 2: Run Services Separately
-
-**Start the Backend:**
-
+Backend (terminal 1):
 ```bash
 cd backend
 uv sync
-uv run python main.py
+uv run python main.py  # or: uv run uvicorn main:app --host 0.0.0.0 --port 3000
 ```
 
-The backend will run on port 3000.
-
-**Start the Frontend (in a new terminal):**
-
+Frontend (terminal 2):
 ```bash
 cd frontend
 npm install  # or: bun install
 npm run dev  # or: bun dev
 ```
 
-The frontend will run on port 8080.
+Access: in Codespaces, open forwarded port 8080; the Vite dev server proxies `/api/*` to `localhost:3000`.
 
-### 3. Access the Application
+## Project layout
+- backend/ — FastAPI app with session and participant routes
+- frontend/ — Vite + React SPA with in-browser execution runtime
+- openapi.yaml — OpenAPI schema for the backend
 
-In GitHub Codespaces:
-- The frontend will be automatically forwarded to port 8080
-- Click the "Ports" tab and open the port 8080 URL
-- The frontend will proxy API requests to the backend on port 3000
+## API
+- `POST /v1/sessions` — Create a new session
+- `GET /v1/sessions/{id}` — Get session details
+- `PUT /v1/sessions/{id}` — Update session code
+- `PUT /v1/sessions/{id}/language` — Change programming language
+- `GET /v1/sessions/{id}/participants` — List participants in a session
+- `POST /v1/sessions/{id}/participants` — Join a session
+- `POST /v1/execute` — Returns 410 Gone; server-side execution is disabled. Run code in the client via the WASM runtime.
 
-## Architecture
+Docs are available when the backend is running at `http://localhost:3000/docs` (Swagger) and `/redoc`.
 
-- **Backend**: FastAPI (Python) - REST API for session management and code execution
-- **Frontend**: React + TypeScript + Vite - Real-time collaborative coding interface
-- **Database**: In-memory storage (for development)
+## Client-side code execution
+- Languages: Python, JavaScript, TypeScript
+- Tooling: Pyodide, QuickJS, and esbuild-wasm (for TS transpile)
+- Rationale: the backend never executes untrusted code; execution happens entirely in the browser.
 
-## Features
+## Development commands
 
-- Create and join coding sessions
-- Multi-language support (JavaScript, TypeScript, Python, Java, C++)
-- Real-time code execution
-- Collaborative editing with participant cursors
-- Share session links
-
-## API Endpoints
-
-- `POST /v1/sessions` - Create a new session
-- `GET /v1/sessions/{id}` - Get session details
-- `PUT /v1/sessions/{id}` - Update session code
-- `PUT /v1/sessions/{id}/language` - Change programming language
-- `POST /v1/execute` - Execute code
-
-## GitHub Codespaces Configuration
-
-The application is configured to work out-of-the-box in GitHub Codespaces:
-
-- **CORS**: Backend allows all origins (configure for production)
-- **Proxy**: Frontend Vite server proxies `/api/*` to `localhost:3000`
-- **Ports**: Frontend (8080) and Backend (3000) are auto-forwarded
-
-## Development
-
-### Backend
+Backend:
 ```bash
 cd backend
 uv add <package>      # Add dependency
 uv run python main.py # Run server
 ```
 
-### Frontend
+Frontend:
 ```bash
 cd frontend
 npm run dev          # Development server
@@ -95,63 +84,32 @@ npm run lint         # Lint code
 
 ## Testing
 
-### Backend Integration Tests
-
-The backend has pytest-based integration tests that verify all API endpoints:
-
+Backend integration tests (backend service should be running on :3000):
 ```bash
 cd backend
-
-# Install dependencies (if not already done)
 uv sync
-
-# Make sure the server is running on port 3000
-# In another terminal: uv run python main.py
-
-# Run tests with pytest
+uv run python main.py  # in a separate terminal
 uv run pytest test_api.py -v
-
-# Or run tests standalone
-uv run python test_api.py
+# or: uv run python test_api.py
 ```
 
-Tests cover:
-- Creating sessions
-- Getting session details
-- Updating code
-- Joining sessions
-- Code execution
-
-### Frontend Tests
-
-Run unit and component tests with Vitest:
-
+Frontend tests (Vitest):
 ```bash
 cd frontend
-
-# Install dependencies (if not already done)
 npm install
-
-# Run tests
 npm test
 ```
 
-Tests cover:
-- Component rendering and interactions
-- API service functions
-- User interactions with UI components
+## Environment variables
 
-## Environment Variables
-
-### Frontend (.env)
+Frontend `.env`:
 ```
 VITE_API_URL=/api    # API proxy path
 ```
 
-## Next Steps
-
-- [ ] Implement WebSocket for real-time collaboration
-- [ ] Add authentication
-- [ ] Persistent database (PostgreSQL/MongoDB)
-- [ ] Deploy to production
-- [ ] Add more language support
+## Next steps
+- Implement WebSocket-based real-time collaboration
+- Add authentication and authorization
+- Replace in-memory storage with a persistent database
+- Add production deployment path
+- Expand language/runtime support as the in-browser toolchain grows
