@@ -7,13 +7,28 @@ Collaborative coding platform for interviews and pair programming. FastAPI power
 - React + TypeScript + Vite UI
 - Client-side execution: Pyodide (Python) and QuickJS + esbuild-wasm (JavaScript/TypeScript)
 - Dev scripts orchestrated with npm and uv
+- Docker containerization with nginx reverse proxy
 
 ## Prerequisites
 - Node.js 18+ (or Bun)
 - Python 3.12+ with `uv` installed (`pip install uv`)
+- Docker and Docker Compose (for containerized deployment)
 - GitHub Codespaces already includes these in the default image
 
-## Quick Start (Codespaces or local)
+## Quick Start
+
+### Docker (Recommended for Production)
+
+**Single command deployment:**
+```bash
+docker-compose up --build
+```
+
+The application will be available at `http://localhost:8080` with:
+- Frontend served on `/`
+- Backend API accessible on `/api/*` (proxied by nginx)
+
+### Development (Native)
 
 **Option 1: Run both services together (recommended)**
 ```bash
@@ -67,14 +82,29 @@ Docs are available when the backend is running at `http://localhost:3000/docs` (
 
 ## Development commands
 
-Backend:
+### Docker Commands
+```bash
+# Build and run the containerized app
+docker-compose up --build
+
+# Run in detached mode
+docker-compose up -d --build
+
+# Stop the services
+docker-compose down
+
+# View logs
+docker-compose logs -f
+```
+
+### Backend Commands
 ```bash
 cd backend
 uv add <package>      # Add dependency
 uv run python main.py # Run server
 ```
 
-Frontend:
+### Frontend Commands
 ```bash
 cd frontend
 npm run dev          # Development server
@@ -107,9 +137,24 @@ Frontend `.env`:
 VITE_API_URL=/api    # API proxy path
 ```
 
+## Docker Architecture
+
+The application uses a multi-stage Docker build:
+
+- **Base Stage**: Sets up Ubuntu 24.04 with Python, uv, Bun, nginx, and supervisor
+- **Backend Builder**: Installs Python dependencies and prepares FastAPI backend
+- **Frontend Builder**: Builds React/TypeScript frontend for production
+- **Production Stage**: Combines built assets with nginx reverse proxy
+
+### Container Components:
+- **Nginx**: Serves frontend static files and proxies `/api/*` to backend
+- **FastAPI Backend**: Runs on port 3000 (internal)
+- **Supervisor**: Manages both nginx and backend processes
+- **Single Port**: Application accessible on port 80 (mapped to 8080 via compose)
+
 ## Next steps
 - Implement WebSocket-based real-time collaboration
 - Add authentication and authorization
 - Replace in-memory storage with a persistent database
-- Add production deployment path
+- Add production Kubernetes manifests
 - Expand language/runtime support as the in-browser toolchain grows
