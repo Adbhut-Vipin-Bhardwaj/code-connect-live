@@ -59,6 +59,20 @@ def update_participant(session_id: str, participant_id: str, updates: Dict[str, 
     return None
 
 
+def remove_participant(session_id: str, participant_id: str) -> bool:
+    """Remove a participant from a session."""
+    if session_id not in participants:
+        return False
+
+    session_participants = participants.get(session_id, [])
+    initial_len = len(session_participants)
+    participants[session_id] = [p for p in session_participants if p.get("id") != participant_id]
+    # Drop empty session entries to avoid stale lists
+    if not participants[session_id]:
+        participants.pop(session_id, None)
+    return len(participants.get(session_id, [])) != initial_len
+
+
 def participant_exists(session_id: str, name: str) -> bool:
     """Check if a participant with the given name exists in the session."""
     session_participants = participants.get(session_id, [])

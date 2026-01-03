@@ -13,6 +13,7 @@ import {
   getParticipants,
   joinSession,
   updateParticipant,
+  leaveSession,
   executeCode,
   subscribeToSession,
   subscribeToParticipants,
@@ -243,6 +244,22 @@ const InterviewRoom = () => {
       }
     };
   }, []);
+
+  // Remove participant when leaving the page/tab
+  useEffect(() => {
+    if (!sessionId || !currentParticipantId) return;
+
+    const handleBeforeUnload = () => {
+      leaveSession(sessionId, currentParticipantId, { keepalive: true }).catch(() => {});
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      leaveSession(sessionId, currentParticipantId).catch(() => {});
+    };
+  }, [sessionId, currentParticipantId]);
 
   // Ensure current visitor is registered as a participant for this session
   useEffect(() => {

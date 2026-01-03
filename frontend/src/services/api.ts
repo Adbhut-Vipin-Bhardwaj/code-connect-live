@@ -164,6 +164,25 @@ export async function updateParticipant(
   });
 }
 
+export async function leaveSession(
+  sessionId: string,
+  participantId: string,
+  options?: { keepalive?: boolean }
+): Promise<void> {
+  const url = `${BASE_URL}/sessions/${sessionId}/participants/${participantId}`;
+  const response = await fetch(url, {
+    method: 'DELETE',
+    keepalive: options?.keepalive,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  // Treat 404 as already gone so cleanup is idempotent
+  if (!response.ok && response.status !== 404) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to leave session');
+  }
+}
+
 export async function executeCode(code: string, language: string): Promise<CodeExecutionResult> {
   return executeInBrowser(code, language);
 }

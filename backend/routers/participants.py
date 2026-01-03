@@ -79,6 +79,26 @@ def update_participant(sessionId: str, participantId: str, request: UpdatePartic
     return participant
 
 
+@router.delete("/{sessionId}/participants/{participantId}", status_code=status.HTTP_204_NO_CONTENT)
+def leave_session(sessionId: str, participantId: str):
+    """Remove a participant from a session when they leave/close the tab."""
+    session = database.get_session(sessionId)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "Session not found", "code": 404}
+        )
+
+    removed = database.remove_participant(sessionId, participantId)
+    if not removed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "Participant not found", "code": 404}
+        )
+
+    return None
+
+
 @router.get("/{sessionId}/participants/stream")
 async def stream_participants(sessionId: str):
     """Server-sent events stream of participant list for basic real-time updates."""
