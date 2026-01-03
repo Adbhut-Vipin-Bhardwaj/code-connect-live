@@ -113,6 +113,9 @@ async def stream_participants(sessionId: str):
         last_payload = None
         try:
             while True:
+                if not database.get_session(sessionId):
+                    break
+
                 participant_list = database.get_participants(sessionId)
                 payload = json.dumps(participant_list)
                 if payload != last_payload:

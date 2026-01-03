@@ -1,5 +1,6 @@
 """In-memory database for sessions and participants."""
 
+import time
 from typing import Dict, List, Any
 
 # In-memory storage (use a real database in production)
@@ -12,9 +13,28 @@ def get_session(session_id: str) -> Dict[str, Any]:
     return sessions.get(session_id)
 
 
+def _now() -> float:
+    return time.time()
+
+
+def _touch_session(session_id: str, *, participant_activity: bool = False) -> None:
+    """Update session activity timestamps."""
+    if session_id not in sessions:
+        return
+    now = _now()
+    sessions[session_id]["lastActivity"] = now
+    if participant_activity:
+        sessions[session_id]["lastParticipantActivity"] = now
+
+
 def create_session(session_id: str, session_data: Dict[str, Any]) -> None:
     """Create a new session."""
-    sessions[session_id] = session_data
+    now = _now()
+    sessions[session_id] = {
+        **session_data,
+        "lastActivity": now,
+        "lastParticipantActivity": now,
+    }
     participants[session_id] = []
 
 
@@ -24,6 +44,7 @@ def update_session_code(session_id: str, code: str, version: int, client_id: str
         sessions[session_id]["code"] = code
         sessions[session_id]["version"] = version
         sessions[session_id]["lastClientId"] = client_id
+        _touch_session(session_id)
 
 
 def update_session_language(session_id: str, language: str, code: str, version: int, client_id: str) -> None:
@@ -33,6 +54,7 @@ def update_session_language(session_id: str, language: str, code: str, version: 
         sessions[session_id]["code"] = code
         sessions[session_id]["version"] = version
         sessions[session_id]["lastClientId"] = client_id
+        _touch_session(session_id)
 
 
 def get_participants(session_id: str) -> List[Dict[str, Any]]:
@@ -45,6 +67,7 @@ def add_participant(session_id: str, participant_data: Dict[str, Any]) -> None:
     if session_id not in participants:
         participants[session_id] = []
     participants[session_id].append(participant_data)
+    _touch_session(session_id, participant_activity=True)
 
 
 def update_participant(session_id: str, participant_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
@@ -55,6 +78,7 @@ def update_participant(session_id: str, participant_id: str, updates: Dict[str, 
             for key, value in updates.items():
                 if value is not None:
                     participant[key] = value
+            _touch_session(session_id, participant_activity=True)
             return participant
     return None
 
@@ -70,7 +94,16 @@ def remove_participant(session_id: str, participant_id: str) -> bool:
     # Drop empty session entries to avoid stale lists
     if not participants[session_id]:
         participants.pop(session_id, None)
-    return len(participants.get(session_id, [])) != initial_len
+    removed = len(participants.get(session_id, [])) != initial_len
+    if removed:
+        _touch_session(session_id, participant_activity=True)
+    return removed
+
+
+def delete_session(session_id: str) -> None:
+    """Delete a session and its participants."""
+    sessions.pop(session_id, None)
+    participants.pop(session_id, None)
 
 
 def participant_exists(session_id: str, name: str) -> bool:

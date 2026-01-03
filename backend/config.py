@@ -13,6 +13,11 @@ SUPPORTED_LANGUAGES = ["javascript", "python", "typescript"]
 # Execution timeout in seconds
 EXECUTION_TIMEOUT = 5
 
+# Session cleanup configuration (seconds)
+STALE_NO_PARTICIPANT_TTL = 5 * 60  # remove sessions idle without participants
+STALE_INACTIVE_TTL = 20 * 60       # remove sessions with no activity even if participants exist
+STALE_SWEEP_INTERVAL = 60          # how often to sweep for stale sessions
+
 # Server configuration
 HOST = "0.0.0.0"
 PORT = 3000
