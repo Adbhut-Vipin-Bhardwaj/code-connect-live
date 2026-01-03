@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: code-connect-live
+    env: docker
+    plan: starter
+    dockerfilePath: Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: "3000"
